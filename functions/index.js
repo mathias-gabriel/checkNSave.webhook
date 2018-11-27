@@ -1,221 +1,94 @@
-// Copyright 2017, Google, Inc.
-// Licensed under the Apache License, Version 2.0 (the 'License');
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an 'AS IS' BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-// Dialogflow fulfillment getting started guide:
-// https://dialogflow.com/docs/how-tos/getting-started-fulfillment
+/**
+ * Copyright 2017 Google Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ChecknSave Le ChatBot Assistant Secouriste et Formateur Auteur Carlos Rodriguez  ver0.4
+ */
 
 'use strict';
 
-const mqtt = require('mqtt')
-const client = mqtt.connect('mqtt://owaveservices.info')
-
-const http = require('http');
 const functions = require('firebase-functions');
-const {dialogflow,Permission} = require('actions-on-google');
+const admin = require('firebase-admin');
+const {WebhookClient} = require('dialogflow-fulfillment');
 
-// Create an app instance
-const app = dialogflow()
+process.env.DEBUG = 'BILAN:*'; // enables lib debugging statements
+admin.initializeApp(functions.config().firebase);
+const db = admin.firestore();
 
+exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, response) => {
+  const agent = new WebhookClient({ request, response });
 
-function callCheckNSaveApi(){
-    return new Promise(function(resolve, reject){
-        request('http://owaveservices.info:5003/defibrilatteurs/0.1234/50.1234/0/1', function (err, response, body) {
-            // in addition to parsing the value, deal with possible errors
-            if (err) return reject(err);
-            try {
-                // JSON.parse() can throw an exception if not valid JSON
-                resolve(JSON.parse(body).data.available_balance);
-            } catch(e) {
-                reject(e);
-            }
-        });
+function DEMANDER_AIDE_VICTIME_FONCTION (agent) {
+    // Get parameter from Dialogflow with the string to add to the database
+    const NomEntry = agent.parameters.NomEntry; //NomEntry
+	const TelEntry = agent.parameters.TelEntry; //TelEntry
+	const GpsEntry = agent.parameters.GpsEntry; //GpsEntry
+    // Get the database collection 'dialogflow' and document 'agent' and store
+    // the document  {entry: "<value of database entry>"} in the 'agent' document
+    const dialogflowAgentRef = db.collection('BILAN').doc('Victime');
+    return db.runTransaction(t => {
+      t.set(dialogflowAgentRef, {NOM: NomEntry, Tél: TelEntry, GPS: GpsEntry}); 
+      return Promise.resolve('Ecriture correctement effectuée');
+    }).then(doc => {
+      agent.add(`Votre NOM "${NomEntry}" et votre numéro de télephone "${TelEntry}" et votre GPS est activé "${GpsEntry}" ont bien été enregistrés.`);
+    }).catch(err => {
+      console.log(`Erreur d'écriture en base: ${err}`);
+      agent.add(`Erreur de mémorisation de votre Nom en base.`);
     });
-}
+  }
 
+function DEMANDER_AIDE_TEMOIN_FONCTION (agent) {
+    // Get parameter from Dialogflow with the string to add to the database
+    const ModeEntry = agent.parameters.ModeEntry;
+    // Get the database collection 'dialogflow' and document 'agent' and store
+    // the document  {entry: "<value of database entry>"} in the 'agent' document
+    const dialogflowAgentRef = db.collection('BILAN').doc('Témoin');
+    return db.runTransaction(t => {
+      t.set(dialogflowAgentRef, {Mode: ModeEntry}); //databaseEntry @sys_any  $databaseEntry Mode Assistant-secouriste Mode Formateur
+      return Promise.resolve('Ecriture correctement effectuée');
+    }).then(doc => {
+      agent.add(`Le mode choisi "${ModeEntry}" a bien été enregistré.`);
+	  
+    }).catch(err => {
+      console.log(`Erreur d'écriture en base: ${err}`);
+      agent.add(`Erreur de mémorisation du mode sélectionné en base.`); //"${databaseEntry}"
+    });
+  }
 
-app.intent('request_permission', (conv) => {
+  
+function readFromDb (agent) {
+    // Get the database collection 'dialogflow' and document 'agent'
+    const dialogflowAgentDoc = db.collection('BILAN').doc('Victime');
 
-
-	conv.data.requestedPermission = 'DEVICE_PRECISE_LOCATION';
-	return conv.ask(new Permission({
-		context: 'to locate you',
-		permissions: conv.data.requestedPermission,
-	}));
-
+    // Get the value of 'entry' in the document and send it to the user
+    return dialogflowAgentDoc.get()
+      .then(doc => {
+        if (!doc.exists) {
+          agent.add('Désolé aucune donnée de trouvé!');
+        } else {
+          agent.add(doc.data().Mode);
+        }
+        return Promise.resolve('Lecture faite');
+      }).catch(() => {
+        agent.add('Erreur de lecture de la base de donnée.');
+        agent.add('Vous pouvez ajouter un nouveau mot en disant, "Ecrit ta phrase dans la base"');
+      });
+  }
+  // Map from Dialogflow intent names to functions to be run when the intent is matched
+  let intentMap = new Map();
+  //intentMap.set('DEMANDER_AIDE_INTENT', DEMANDER_AIDE_FONCTION);
+  intentMap.set('DEMANDER_AIDE_VICTIME_INTENT', DEMANDER_AIDE_VICTIME_FONCTION);
+  intentMap.set('DEMANDER_AIDE_TEMOIN_INTENT', DEMANDER_AIDE_TEMOIN_FONCTION);
+  //intentMap.set('_INTENT', _FONCTION);
+  agent.handleRequest(intentMap);
 });
-
-// Intent in Dialogflow called `Goodbye`
-app.intent('Demander_Aide_INTENT-Seul', (conv, params, permissionGranted) => {
-
-
-
-		return conv.ask("J'ai votre position GPS. Est-ce que vous pouvez maintenant me dicter votre numéro de téléphone, s'il-vous plaît?"); //coordinates.latitude
-
-		//return conv.ask("Merci. Est-ce que vous pouvez maintenant me dicter votre numéro de téléphone, s'il-vous plaît? oui? ou non?"); //coordinates.latitude
-
-		/*if (permissionGranted) {
-			const {requestedPermission} = conv.data;
-			if (requestedPermission === 'DEVICE_PRECISE_LOCATION') {
-
-				const {coordinates} = conv.device.location;
-				//const city=conv.device.location.city;
-				//const formattedAddress=conv.device.location.formattedAddress;
-
-				if (coordinates) {
-					
-					return conv.ask("Merci. Est-ce que vous pouvez maintenant me dicter votre numéro de téléphone, s'il-vous plaît? oui? ou non?"); //coordinates.latitude
-					//return conv.close('You are at ${coordinates.longitude} ${coordinates.latitude}'); //coordinates.latitude
-				} else {
-					// Note: Currently, precise locaton only returns lat/lng coordinates on phones and lat/lng coordinates
-					// and a geocoded address on voice-activated speakers.
-					// Coarse location only works on voice-activated speakers.
-					return conv.close('Vous êtes tout seul, ne vous inquiétez pas je vais prévenir les secours. Mais j\'ai besoin de vous géolocaliser, pouvez vous activer votre GPS s\'il-vous-plaît?');
-				}
-
-			}
-
-		} else {
-			return conv.close('Vous êtes tout seul, ne vous inquiétez pas je vais prévenir les secours. Mais j\'ai besoin de vous géolocaliser. Pouvez vous autoriser l\'utilisation du gps ? ');
-		}*/
-
-		//conv.close('Merci. En attendant les secours, quel est la nature de votre problème, c\'est un accident? ou une maladie?')
-})
-
-
-// Intent in Dialogflow called `Goodbye`
-app.intent('yes-procedure', conv => {
-		  conv.close('See you later!')
-})
-
-// Intent in Dialogflow called `Goodbye`
-app.intent('GPS_INTENT - Tel', conv => {
-		  conv.close('j\'ai récupéré votre numero de téléphone')
-})
-
-// Intent in Dialogflow called `Goodbye`
-app.intent('contact_INTENT', (conv, params) => {
-
-		console.log("conv")
-		console.log(conv)
-		console.log("params")
-		console.log(params)
-
-		var phone = params.telephone
-		var name = params.name
-
-		var message = "numero de tel : "+phone+"; nom: "+name
-		client.publish('home/mathias', message)
-
-		return conv.ask("J'ai votre position GPS, votre numero de tel est le suivant: "+phone+" et votre nom est: "+name+". En attendant les secours, quel est la nature de votre problème, c\'est un accident? ou une maladie?"); //coordinates.latitude
-
-		//return conv.ask("Merci. Est-ce que vous pouvez maintenant me dicter votre numéro de téléphone, s'il-vous plaît? oui? ou non?"); //coordinates.latitude
-
-		/*if (permissionGranted) {
-			const {requestedPermission} = conv.data;
-			if (requestedPermission === 'DEVICE_PRECISE_LOCATION') {
-
-				const {coordinates} = conv.device.location;
-				//const city=conv.device.location.city;
-				//const formattedAddress=conv.device.location.formattedAddress;
-
-				if (coordinates) {
-					
-					return conv.ask("Merci. Est-ce que vous pouvez maintenant me dicter votre numéro de téléphone, s'il-vous plaît? oui? ou non?"); //coordinates.latitude
-					//return conv.close('You are at ${coordinates.longitude} ${coordinates.latitude}'); //coordinates.latitude
-				} else {
-					// Note: Currently, precise locaton only returns lat/lng coordinates on phones and lat/lng coordinates
-					// and a geocoded address on voice-activated speakers.
-					// Coarse location only works on voice-activated speakers.
-					return conv.close('Vous êtes tout seul, ne vous inquiétez pas je vais prévenir les secours. Mais j\'ai besoin de vous géolocaliser, pouvez vous activer votre GPS s\'il-vous-plaît?');
-				}
-
-			}
-
-		} else {
-			return conv.close('Vous êtes tout seul, ne vous inquiétez pas je vais prévenir les secours. Mais j\'ai besoin de vous géolocaliser. Pouvez vous autoriser l\'utilisation du gps ? ');
-		}*/
-
-
-
-		  conv.close('Merci. En attendant les secours, quel est la nature de votre problème, c\'est un accident? ou une maladie?')
-})
-
-
-const request = require("request");
-app.intent("no-Seul-localiser", conv => {
-
-	return new Promise(function(resolve, reject){
-        request('http://owaveservices.info:5003/defibrilatteurs/0.1234/50.1234/0/1', function (err, response, body) {
-            // in addition to parsing the value, deal with possible errors
-            if (err) return reject(err);
-            try {
-                // JSON.parse() can throw an exception if not valid JSON
-                resolve(JSON.parse(body).data.available_balance);
-            } catch(e) {
-                reject(e);
-            }
-        });
-    }).then(function(val) {
-    	return conv.close('votre localisation a été envoyé.');
-	}).catch(function(err) {
-    	return conv.close('votre localisation n\'a pas été envoyé.');
-	});
-
- });
-
-
-app.intent('user-info', (conv, params, permissionGranted) => {
-
-	// make the request
-	return new Promise(function(resolve, reject){
-    request('http://owaveservices.info:5003/defibrilatteurs/0.1234/50.1234/0/1', function (err, response, body) {
-            // in addition to parsing the value, deal with possible errors
-            if (err) return reject(err);
-            try {
-                // JSON.parse() can throw an exception if not valid JSON
-                resolve(JSON.parse(body).data.available_balance);
-            } catch(e) {
-                reject(e);
-            }
-        });
-    }).then(function(val) {
-    	return conv.close('vos informations ont été envoyé.');
-	}).catch(function(err) {
-    	return conv.close('vos informations n\'ont pas été envoyé.');
-	});
-
-	/*if (permissionGranted) {
-		const {requestedPermission} = conv.data;
-		if (requestedPermission === 'DEVICE_PRECISE_LOCATION') {
-
-			const {coordinates} = conv.device.location;
-			//const city=conv.device.location.city;
-			//const formattedAddress=conv.device.location.formattedAddress;
-
-			if (coordinates) {
-				return conv.close('You are at ${coordinates.longitude} ${coordinates.latitude}'); //coordinates.latitude
-			} else {
-				// Note: Currently, precise locaton only returns lat/lng coordinates on phones and lat/lng coordinates
-				// and a geocoded address on voice-activated speakers.
-				// Coarse location only works on voice-activated speakers.
-				return conv.close('Sorry, I could not figure out where you are.');
-			}
-
-		}
-	} else {
-		return conv.close('Sorry, permission denied.');
-	}*/
-})
-
-exports.dialogflowFirebaseFulfillment = functions.https.onRequest(app);
-

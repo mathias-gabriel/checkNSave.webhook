@@ -20,32 +20,17 @@ const mqtt = require('mqtt')
 const client = mqtt.connect('mqtt://owaveservices.info')
 
 const http = require('http');
+const request = require("request");
+
 const functions = require('firebase-functions');
 const {dialogflow,Permission} = require('actions-on-google');
+
 
 // Create an app instance
 const app = dialogflow()
 
-
-function callCheckNSaveApi(){
-    return new Promise(function(resolve, reject){
-        request('http://owaveservices.info:5003/defibrilatteurs/0.1234/50.1234/0/1', function (err, response, body) {
-            // in addition to parsing the value, deal with possible errors
-            if (err) return reject(err);
-            try {
-                // JSON.parse() can throw an exception if not valid JSON
-                resolve(JSON.parse(body).data.available_balance);
-            } catch(e) {
-                reject(e);
-            }
-        });
-    });
-}
-
-
-app.intent('request_permission', (conv) => {
-
-
+app.intent('REQUEST_PERMISSION', (conv) => {
+	
 	conv.data.requestedPermission = 'DEVICE_PRECISE_LOCATION';
 	return conv.ask(new Permission({
 		context: 'to locate you',
@@ -54,168 +39,159 @@ app.intent('request_permission', (conv) => {
 
 });
 
-// Intent in Dialogflow called `Goodbye`
-app.intent('Demander_Aide_INTENT-Seul', (conv, params, permissionGranted) => {
 
+/******************************************************************************/
 
+app.intent('DEMANDER_AIDE_VICTIME_INTENT', (conv, params, permissionGranted) => {
 
-		return conv.ask("J'ai votre position GPS. Est-ce que vous pouvez maintenant me dicter votre numéro de téléphone, s'il-vous plaît?"); //coordinates.latitude
+	const NomEntry = params.NomEntry; //NomEntry
+	const TelEntry = params.TelEntry; //TelEntry
 
-		//return conv.ask("Merci. Est-ce que vous pouvez maintenant me dicter votre numéro de téléphone, s'il-vous plaît? oui? ou non?"); //coordinates.latitude
-
-		/*if (permissionGranted) {
-			const {requestedPermission} = conv.data;
-			if (requestedPermission === 'DEVICE_PRECISE_LOCATION') {
-
-				const {coordinates} = conv.device.location;
-				//const city=conv.device.location.city;
-				//const formattedAddress=conv.device.location.formattedAddress;
-
-				if (coordinates) {
-					
-					return conv.ask("Merci. Est-ce que vous pouvez maintenant me dicter votre numéro de téléphone, s'il-vous plaît? oui? ou non?"); //coordinates.latitude
-					//return conv.close('You are at ${coordinates.longitude} ${coordinates.latitude}'); //coordinates.latitude
-				} else {
-					// Note: Currently, precise locaton only returns lat/lng coordinates on phones and lat/lng coordinates
-					// and a geocoded address on voice-activated speakers.
-					// Coarse location only works on voice-activated speakers.
-					return conv.close('Vous êtes tout seul, ne vous inquiétez pas je vais prévenir les secours. Mais j\'ai besoin de vous géolocaliser, pouvez vous activer votre GPS s\'il-vous-plaît?');
-				}
-
-			}
-
-		} else {
-			return conv.close('Vous êtes tout seul, ne vous inquiétez pas je vais prévenir les secours. Mais j\'ai besoin de vous géolocaliser. Pouvez vous autoriser l\'utilisation du gps ? ');
-		}*/
-
-		//conv.close('Merci. En attendant les secours, quel est la nature de votre problème, c\'est un accident? ou une maladie?')
-})
-
-
-// Intent in Dialogflow called `Goodbye`
-app.intent('yes-procedure', conv => {
-		  conv.close('See you later!')
-})
-
-// Intent in Dialogflow called `Goodbye`
-app.intent('GPS_INTENT - Tel', conv => {
-		  conv.close('j\'ai récupéré votre numero de téléphone')
-})
-
-// Intent in Dialogflow called `Goodbye`
-app.intent('contact_INTENT', (conv, params) => {
-
-		console.log("conv")
-		console.log(conv)
-		console.log("params")
-		console.log(params)
-
-		var phone = params.telephone
-		var name = params.name
-
-		var message = "numero de tel : "+phone+"; nom: "+name
-		client.publish('home/mathias', message)
-
-		return conv.ask("J'ai votre position GPS, votre numero de tel est le suivant: "+phone+" et votre nom est: "+name+". En attendant les secours, quel est la nature de votre problème, c\'est un accident? ou une maladie?"); //coordinates.latitude
-
-		//return conv.ask("Merci. Est-ce que vous pouvez maintenant me dicter votre numéro de téléphone, s'il-vous plaît? oui? ou non?"); //coordinates.latitude
-
-		/*if (permissionGranted) {
-			const {requestedPermission} = conv.data;
-			if (requestedPermission === 'DEVICE_PRECISE_LOCATION') {
-
-				const {coordinates} = conv.device.location;
-				//const city=conv.device.location.city;
-				//const formattedAddress=conv.device.location.formattedAddress;
-
-				if (coordinates) {
-					
-					return conv.ask("Merci. Est-ce que vous pouvez maintenant me dicter votre numéro de téléphone, s'il-vous plaît? oui? ou non?"); //coordinates.latitude
-					//return conv.close('You are at ${coordinates.longitude} ${coordinates.latitude}'); //coordinates.latitude
-				} else {
-					// Note: Currently, precise locaton only returns lat/lng coordinates on phones and lat/lng coordinates
-					// and a geocoded address on voice-activated speakers.
-					// Coarse location only works on voice-activated speakers.
-					return conv.close('Vous êtes tout seul, ne vous inquiétez pas je vais prévenir les secours. Mais j\'ai besoin de vous géolocaliser, pouvez vous activer votre GPS s\'il-vous-plaît?');
-				}
-
-			}
-
-		} else {
-			return conv.close('Vous êtes tout seul, ne vous inquiétez pas je vais prévenir les secours. Mais j\'ai besoin de vous géolocaliser. Pouvez vous autoriser l\'utilisation du gps ? ');
-		}*/
-
-
-
-		  conv.close('Merci. En attendant les secours, quel est la nature de votre problème, c\'est un accident? ou une maladie?')
-})
-
-
-const request = require("request");
-app.intent("no-Seul-localiser", conv => {
-
-	return new Promise(function(resolve, reject){
-        request('http://owaveservices.info:5003/defibrilatteurs/0.1234/50.1234/0/1', function (err, response, body) {
-            // in addition to parsing the value, deal with possible errors
-            if (err) return reject(err);
-            try {
-                // JSON.parse() can throw an exception if not valid JSON
-                resolve(JSON.parse(body).data.available_balance);
-            } catch(e) {
-                reject(e);
-            }
-        });
-    }).then(function(val) {
-    	return conv.close('votre localisation a été envoyé.');
-	}).catch(function(err) {
-    	return conv.close('votre localisation n\'a pas été envoyé.');
-	});
-
- });
-
-
-app.intent('user-info', (conv, params, permissionGranted) => {
-
-	// make the request
-	return new Promise(function(resolve, reject){
-    request('http://owaveservices.info:5003/defibrilatteurs/0.1234/50.1234/0/1', function (err, response, body) {
-            // in addition to parsing the value, deal with possible errors
-            if (err) return reject(err);
-            try {
-                // JSON.parse() can throw an exception if not valid JSON
-                resolve(JSON.parse(body).data.available_balance);
-            } catch(e) {
-                reject(e);
-            }
-        });
-    }).then(function(val) {
-    	return conv.close('vos informations ont été envoyé.');
-	}).catch(function(err) {
-    	return conv.close('vos informations n\'ont pas été envoyé.');
-	});
-
-	/*if (permissionGranted) {
+	if (permissionGranted) {
+		
 		const {requestedPermission} = conv.data;
+
 		if (requestedPermission === 'DEVICE_PRECISE_LOCATION') {
+			console.log(conv.device.location.coordinates.latitude);
+			var latitude = conv.device.location.coordinates.latitude;
+			console.log(conv.device.location.coordinates.longitude);
+			var longitude = conv.device.location.coordinates.longitude;
 
-			const {coordinates} = conv.device.location;
-			//const city=conv.device.location.city;
-			//const formattedAddress=conv.device.location.formattedAddress;
+			//return conv.close('vos informations ont été envoyé.');
 
-			if (coordinates) {
-				return conv.close('You are at ${coordinates.longitude} ${coordinates.latitude}'); //coordinates.latitude
-			} else {
-				// Note: Currently, precise locaton only returns lat/lng coordinates on phones and lat/lng coordinates
-				// and a geocoded address on voice-activated speakers.
-				// Coarse location only works on voice-activated speakers.
-				return conv.close('Sorry, I could not figure out where you are.');
-			}
+			return new Promise(function(resolve, reject){
 
+				var url = 'http://owaveservices.info:5003/send_report_by_email';
+				var requestData = {
+					"report": "string"
+				}
+
+				request({
+					url: url,
+					method: "POST",
+					json: requestData
+				}, function (err, response, body) {
+					// in addition to parsing the value, deal with possible errors
+					if (err) return reject(err);
+					try {
+						// JSON.parse() can throw an exception if not valid JSON
+						resolve(JSON.parse(body).data);
+					} catch(e) {
+						reject(e);
+					}
+				});
+			}).then(function(val) {
+
+				return conv.ask("En attendant les secours, quel est la nature de votre problème, c\'est un accident? ou une maladie?"); //coordinates.latitude
+
+			}).catch(function(err) {
+				console.log(err);
+				return conv.ask('vos informations n\'ont pas été envoyé.');
+			});
+
+
+		}else{
+			return conv.ask('je n\'ai pas pu récupéré votre position.');
 		}
+
 	} else {
-		return conv.close('Sorry, permission denied.');
-	}*/
-})
+		return conv.ask('Sorry, permission denied.');
+	}
+
+
+});
+
+app.intent('CHECKLIST_INTENT', (conv, params) => {
+
+	var SaignementEntry = params.SaignementEntry;
+	var EtouffementEntry = params.EtouffementEntry;
+	var ConscienteEntry = params.ConscienteEntry;
+	var RespireEntry = params.RespireEntry;
+
+	var message = "La victime nécessite de toute urgence une Réanimation Cardio Pulmonaire.Voulez-vous que je vous explique comment on fait une RCP? dites RCP";
+	return conv.ask(message);
+
+});
+
+app.intent('DEMANDER_AIDE_TEMOIN_INTENT', (conv, params) => {
+
+	const ModeEntry = params.ModeEntry;
+
+	var message = "formateur";
+
+	return conv.ask(message);
+
+});
+
+app.intent('FORMATION_INTENT', (conv, params) => {
+
+	const TitreFormationEntry  = params.TitreFormationEntry ;
+
+	var message = `OK je vais vous montrer quels sont les gestes à faire pour "${TitreFormationEntry}" dites "${TitreFormationEntry}"`;
+
+	return conv.ask(message);
+
+});
+
+app.intent('RCP_INTENT', (conv, params, permissionGranted) => {
+
+	const DefibrillateurEntry = params.DefibrillateurEntry; //DefibrillateurEntry
+	const Titre_VideoEntry = params.Titre_VideoEntry; //Titre_VideoEntry
+
+	if (permissionGranted) {
+
+		const {requestedPermission} = conv.data;
+
+		if (requestedPermission === 'DEVICE_PRECISE_LOCATION') {
+			console.log(conv.device.location.coordinates.latitude);
+			const latitude = conv.device.location.coordinates.latitude;
+			console.log(conv.device.location.coordinates.longitude);
+			const longitude = conv.device.location.coordinates.longitude;
+
+			return new Promise(function(resolve, reject){
+
+				request('http://owaveservices.info:5003/defibrilatteurs/'+longitude+'/'+latitude+'/0/1', function (err, response, body) {
+					// in addition to parsing the value, deal with possible errors
+					if (err) return reject(err);
+					try {
+						// JSON.parse() can throw an exception if not valid JSON
+						resolve(JSON.parse(body));
+					} catch(e) {
+						reject(e);
+					}
+				});
+			}).then(function(val) {
+				console.log(val);
+				var distance = Math.floor( val[0].distance );
+				var message = 'Nous avons trouvé un défibrillateur à '+distance+' mètres.';
+				return conv.ask(message);
+
+			}).catch(function(err) {
+				console.log(err);
+				return conv.ask('Nous n\'avons pas pu trouvé de défibrillateur.');
+			});
+
+		}else{
+			return conv.ask('vos informations n\'ont pas été envoyé.');
+		}
+
+	} else {
+		return conv.ask('Sorry, permission denied.');
+	}
+
+});
+
+
+app.intent('RCP_VIDEO_INTENT', (conv, params) => {
+
+	const Lien_videoEntry = params.Lien_videoEntry; //https://www.youtube.com/watch?v=4W5X-9BQjlU
+	const Type_deviceEntry = params.Type_deviceEntry; //  Chromecast ou Smarphone ?
+
+	var message = `Daccord j'ai mis "${Lien_videoEntry}" sur votre "${Type_deviceEntry}"`;
+
+	return conv.ask(message);
+
+});
 
 exports.dialogflowFirebaseFulfillment = functions.https.onRequest(app);
 

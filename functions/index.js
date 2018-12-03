@@ -16,14 +16,20 @@
 
 'use strict';
 
-const mqtt = require('mqtt')
-const client = mqtt.connect('mqtt://owaveservices.info')
-
 const http = require('http');
 const request = require("request");
 
 const functions = require('firebase-functions');
-const {dialogflow,Permission} = require('actions-on-google');
+const {
+	dialogflow,
+	Permission,
+	SimpleResponse,
+	BasicCard,
+	Image,
+	Suggestions,
+	Button,
+	actionsOnGoogle
+} = require('actions-on-google');
 
 
 // Create an app instance
@@ -183,13 +189,33 @@ app.intent('RCP_INTENT', (conv, params, permissionGranted) => {
 
 
 app.intent('RCP_VIDEO_INTENT', (conv, params) => {
+	
+	//var message = `Daccord j'ai mis "${Lien_videoEntry}" sur votre "${Type_deviceEntry}"`;
 
-	const Lien_videoEntry = params.Lien_videoEntry; //https://www.youtube.com/watch?v=4W5X-9BQjlU
-	const Type_deviceEntry = params.Type_deviceEntry; //  Chromecast ou Smarphone ?
+	//return conv.ask(message);
 
-	var message = `Daccord j'ai mis "${Lien_videoEntry}" sur votre "${Type_deviceEntry}"`;
+	if ( !conv.surface.capabilities.has('actions.capability.SCREEN_OUTPUT') ) {
+		return conv.ask('Sorry, try this on a screen device or select the phone surface in the simulator.');
+	}else{
 
-	return conv.ask(message);
+		// Create a basic card
+		return conv.ask(new BasicCard({
+			formattedText: "test",
+			subtitle: 'This is a subtitle',
+			title: 'Title: this is a title',
+			buttons: new Button({
+				title: 'video',
+				url: 'https://www.youtube.com/watch?v=4W5X-9BQjlU',
+			}),
+			image: new Image({
+				url: 'http://www.leboupere.fr/medias/2016/02/defibrillateur-logo.png',
+				alt: 'Image alternate text',
+			})
+		}));
+	
+	}
+
+	
 
 });
 

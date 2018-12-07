@@ -13,7 +13,7 @@
 
 // Dialogflow fulfillment getting started guide:
 // https://dialogflow.com/docs/how-tos/getting-started-fulfillment
-//  Auteurs  Mathias et Carlos  ver 0.5 le 05/12/18 
+//  Auteurs  Mathias, Adrien  et Carlos  ver 0.8 le 07/12/18  19h45 
 
 'use strict';
 
@@ -35,142 +35,19 @@ const {
 
 // Create an app instance
 const app = dialogflow()
-
-/******************AUTORISATION ACTIVATION GEOLOCALISATION SUR DEVICE************/
+/******************REQUEST_PERMISSION    AUTORISATION ACTIVATION GEOLOCALISATION SUR DEVICE************/
 app.intent('REQUEST_PERMISSION', (conv) => {
 	
 	conv.data.requestedPermission = 'DEVICE_PRECISE_LOCATION';
 	return conv.ask(new Permission({
-		context: 'to locate you',
+		context: 'pour vous localiser',
 		// localise moi
 		permissions: conv.data.requestedPermission,
 	}));
 
 });
-
-
-/********************DEMANDER_AIDE_VICTIME_INTENT*********************************/
-app.intent('DEMANDER_AIDE_VICTIME_INTENT', (conv, params, permissionGranted) => {
-
-	//const NomEntry = params.NomEntry; //NomEntry
-	//const TelEntry = params.TelEntry; //TelEntry
-
-	if (permissionGranted) {
-		
-		const {requestedPermission} = conv.data;
-
-		if (requestedPermission === 'DEVICE_PRECISE_LOCATION') {
-			console.log(conv.device.location.coordinates.latitude);
-			var latitude = conv.device.location.coordinates.latitude;
-			console.log(conv.device.location.coordinates.longitude);
-			var longitude = conv.device.location.coordinates.longitude;
-
-			//return conv.close('vos informations ont été envoyé.');
-
-			return new Promise(function(resolve, reject){
-
-				var url = 'http://owaveservices.info:5003/send_report_by_email';
-				var requestData = {
-					"report": "string"
-				}
-
-				request({
-					url: url,
-					method: "POST",
-					json: requestData
-				}, function (err, response, body) {
-					// in addition to parsing the value, deal with possible errors
-					if (err) return reject(err);
-					try {
-						// JSON.parse() can throw an exception if not valid JSON
-						resolve(JSON.parse(body).data);
-					} catch(e) {
-						reject(e);
-					}
-				});
-			}).then(function(val) {
-
-				return conv.ask("En attendant les secours, quel est la nature de votre problème, c\'est un accident? ou une maladie?"); //coordinates.latitude
-
-			}).catch(function(err) {
-				console.log(err);
-				return conv.ask('vos informations n\'ont pas été envoyé.');
-			});
-
-
-		}else{
-			return conv.ask('je n\'ai pas pu récupéré votre position.');
-		}
-
-	} else {
-		return conv.ask('Sorry, permission denied.');
-	}
-
-
-});
-
-/******************BILAN A ENVOYER PAR MAIL AUX URGENCES************/
-app.intent('BILAN_INTENT', (conv, params) => {
-	
-// 	BILAN à écrire dans le Mail d'envoie au Urgences
-// 	Objet: Bilan d'un accident au 7 rue Paul Vaillant Couturier, 92300 Levallois-Perret 08/12/18 16h00
-//	Nom: Carlos Rodriguez
-//	Tél: 0624102987
-//	Nature du problème: Réanimation Cardio Pulmonaire (RCP) Accident cardiovasculaire dans un Hackathon 
-//	Risques éventuels: Aucun risques éventuels, ni sur-accident 
-//	Localisation précise de l'événement: 7 Rue Paul Vaillant Couturier, 92300 Levallois-Perret 
-//	Nombre de personnes concernées= 1 victime
-//	Etat de chaque victime= La victime est inconsciente et ne respire plus
-//	Premières mesures prises= Alerter les urgences + RCP (avec défibrillateur)
-//  http://owaveservices.info:5003/defibrilatteurs/48.8938615/2.2777903/0/1
-//  http://owaveservices.info:5003/send_report_by_email/Carlos/0624102987/48.8938615/2.2777903
-// http://crodriguez.free.fr/checknsave/ico/CheckList_66x66.png  
-// http://crodriguez.free.fr/checknsave/ico/Bilan_66x66.png
-// http://crodriguez.free.fr/checknsave/ico/ChatBot_66x66.png  
-// http://crodriguez.free.fr/checknsave/ico/Aide_66x66.png  
-    const NomEntry = params.NomEntry; //NomEntry
-	const TelEntry = params.TelEntry; //TelEntry
-	const LatEntry = params.LatEntry; //LatEntry 48.8938615
-	const LngEntry = params.LngEntry; //LngEntry  2.2777903
-	const AdresseEntry = params.AdresseEntry; //AdresseEntry 7 rue Paul Vaillant Couturier, 92300 Levallois-Perret
-	const NatureProblemeEntry = params.NatureProblemeEntry; //NatureProblemeEntry
-    const DateProblemEntry = params.DateProblemEntry;  //DateProblemEntry   08/12/18
-	const TimeProblemEntry = params.TimeProblemEntry;  //TimeProblemEntry  16h00
-	const RisqueEventuelEntry= 'Aucun risques éventuels, ni sur-accident';
-    const NbrVictimeEntry='1';
-	const EtatVictimeEntry='La victime est inconsciente et ne respire plus';
-	const PremieresMesuresEntry='Alerter les urgences + RCP (avec défibrillateur)';
-
-if ( !conv.surface.capabilities.has('actions.capability.SCREEN_OUTPUT') ) {
-		return conv.ask('Sorry, try this on a screen device or select the phone surface in the simulator.');
-	}else{
-
-		// Create a basic card
-		return conv.ask(new BasicCard({
-			formattedText: "BILAN",
-			subtitle: AdresseEntry,
-			title: NatureProblemeEntry,
-			buttons: new Button({
-				title: 'Envoyer Bilan',
-				url: '',
-			}),
-			image: new Image({
-				url: 'http://crodriguez.free.fr/checknsave/ico/Bilan_66x66.png',
-				alt: 'Image alternate text',
-			})
-		}));
-	
-	}
-	return conv.ask('Un bilan a été transmis par mail aux urgences');
-
-});
-
-
-/******************GEOLOCALISATION DEFIBRILLATEUR LE PLUS PROCHE D'UNE VICTIME************/
-app.intent('DEFIBRILLATEUR_INTENT', (conv, params, permissionGranted) => {
-
-	const DefibrillateurEntry = params.DefibrillateurEntry; //DefibrillateurEntry
-	const Titre_VideoEntry = params.Titre_VideoEntry; //Titre_VideoEntry
+/******************USER_INFO    Defibrillateur Géolocalisé  si  autorisation de l'utilisateur et Localisation=Activée************/
+app.intent('USER_INFO', (conv, params, permissionGranted) => {
 
 	if (permissionGranted) {
 
@@ -183,8 +60,8 @@ app.intent('DEFIBRILLATEUR_INTENT', (conv, params, permissionGranted) => {
 			const longitude = conv.device.location.coordinates.longitude;
 
 			return new Promise(function(resolve, reject){
-//http://owaveservices.info:5003/defibrilatteurs/48.8938615/2.2777903/0/1
-				request('http://owaveservices.info:5003/defibrilatteurs/'+longitude+'/'+latitude+'/0/1', function (err, response, body) {
+
+				request('http://owaveservices.info:5003/defibrilatteurs/'+latitude+'/'+longitude+'/0/1', function (err, response, body) {
 					// in addition to parsing the value, deal with possible errors
 					if (err) return reject(err);
 					try {
@@ -197,9 +74,32 @@ app.intent('DEFIBRILLATEUR_INTENT', (conv, params, permissionGranted) => {
 			}).then(function(val) {
 				console.log(val);
 				var distance = Math.floor( val[0].distance );
-				var message = 'Nous avons trouvé un défibrillateur à '+distance+' mètres.';
-				return conv.ask(message);
+				var adresse = val[0].localisatio;
+				//var name = val[0].name;
+				var ville = val[0].ville;
 
+var message = 'Nous avons trouvé un défibrillateur à '+distance+' mètres au '+adresse+' à '+ville+' et un bilan a été transmis aux urgences. Souhaitez vous des informations supplémentaires?';
+ //Souhaitez vous que j\'affiche l\'itinéraire pour aller le chercher? Clicquez sur l\'icone localisation en bleu';            
+			 conv.ask(message);   
+if ( !conv.surface.capabilities.has('actions.capability.SCREEN_OUTPUT') ) {
+	return conv.ask('Désolé mais veuillez utiliser un smartphone ou ChromeCastTV pour visualiser les informations');
+	}else{
+		// Create a basic card
+		return conv.ask(new BasicCard({
+			title: 'DEFIBRILLATEUR',
+			subtitle: 'Distance et adresse',
+			formattedText: message,
+			button: new Button({
+				title: 'Itinéraire',
+				url: 'http://crodriguez.free.fr/checknsave/ico/Defibrillateur_66x66.png'
+			}),
+			image: new Image({
+				url: 'crodriguez.free.fr/checknsave/ico/GPS_66x66.png',
+				alt: 'Image alternate text' //Image alternate text
+			})
+		}));		
+	}
+	
 			}).catch(function(err) {
 				console.log(err);
 				return conv.ask('Nous n\'avons pas pu trouvé de défibrillateur.');
@@ -210,9 +110,76 @@ app.intent('DEFIBRILLATEUR_INTENT', (conv, params, permissionGranted) => {
 		}
 
 	} else {
-		return conv.ask('Sorry, permission denied.');
+		return conv.ask('Désolé je n\'ai pas les autorisations nécessaires pour vous géolocaliser.Veuillez réactiver la localisation');
 	}
 
+});
+
+/******************BILAN A ENVOYER PAR MAIL AUX URGENCES************/
+app.intent('BILAN_INTENT', (conv, params) => {
+	
+// 	BILAN à écrire dans le Mail d'envoie au Urgences
+// 	Objet: Bilan d'un accident au 7 rue Paul Vaillant Couturier, 92300 Levallois-Perret 08/12/18 16h00
+//	Nom: Carlos Rodriguez
+//	Tél: 0624102987
+//	Nature du problème: Accident cardiovasculaire dans un Hackathon 
+//	Risques éventuels: Aucun risques éventuels, ni sur-accident 
+//	Localisation précise de l'événement: 7 Rue Paul Vaillant Couturier, 92300 Levallois-Perret 
+//	Nombre de personnes concernées= 1 victime
+//	Etat de chaque victime= La victime est inconsciente et ne respire plus
+//	Premières mesures prises= Alerter les urgences + Réanimation Cardio Pulmonaire (RCP) (avec défibrillateur)
+//  http://owaveservices.info:5003/defibrilatteurs/48.8938615/2.2777903/0/1
+//  http://owaveservices.info:5003/send_report_by_email/Carlos/0624102987/48.8938615/2.2777903
+// http://owaveservices.info:8080/images/CheckList_66x66.png  
+// http://owaveservices.info:8080/images/Bilan_66x66.png
+// http://owaveservices.info:8080/images/ChatBot_66x66.png  
+// http://owaveservices.info:8080/images/Aide_66x66.png
+//http://owaveservices.info:8080/images/Bilan_66x66.png
+//http://owaveservices.info:8080/images/Aide_66x66.png
+//http://owaveservices.info:8080/images/ChatBot_66x66.png
+//http://owaveservices.info:5003/apidocs/#/default/get_defibrilatteurs__lat___lng___position___limit_
+//http://owaveservices.info:5003/apidocs/#/default/post_send_report_by_email
+  //http://owaveservices.info:5003/apidocs/48.8938615/2.2777903
+    //const NomEntry = params.NomEntry; //NomEntry
+	//const TelEntry = params.TelEntry; //TelEntry
+	//const LatEntry = params.LatEntry; //LatEntry 48.8938615
+	//const LngEntry = params.LngEntry; //LngEntry  2.2777903
+	//const AdresseEntry = params.AdresseEntry; //AdresseEntry 7 rue Paul Vaillant Couturier, 92300 Levallois-Perret
+	//const NatureProblemeEntry = params.NatureProblemeEntry; //NatureProblemeEntry
+	//plus d'info RCP
+	//Accident cardiovasculaire dans un Hackathon
+	//envoyer le bilan
+    //const DateProblemEntry = params.DateProblemEntry;  //DateProblemEntry   08/12/18
+	//const TimeProblemEntry = params.TimeProblemEntry;  //TimeProblemEntry  16h00
+	//const RisqueEventuelEntry= 'Aucun risques éventuels, ni sur-accident';
+    //const NbrVictimeEntry='Une';
+	//const EtatVictimeEntry='La victime est inconsciente et ne respire plus';
+	//const PremieresMesuresEntry='Alerter les urgences et RCP avec défibrillateur';
+//http://owaveservices.info:5003/address/48.8938615/2.2777903
+const NatureProblemeEntry='Accident cardiovasculaire dans un Hackathon';
+conv.ask(`${NatureProblemeEntry} au 7 Rue Paul Vaillant Couturier, 92300 Levallois-Perret . Un bilan a été transmis par mail aux urgences. Je vous remercie d\'avoir utiliser ce ChatBot.Les secours ne vont pas trop tarder à arriver`);
+
+
+if ( !conv.surface.capabilities.has('actions.capability.SCREEN_OUTPUT') ) {
+	return conv.ask('Désolé mais veuillez utiliser un smartphone ou ChromeCastTV pour visualiser les informations');
+	}else{
+		// Create a basic card
+		return conv.ask(new BasicCard({
+			title: 'BILAN',
+			subtitle: 'Nature du problème',
+			formattedText: NatureProblemeEntry,
+			button: new Button({
+				title: 'Envoyer Bilan',
+				url: 'http://owaveservices.info:8080/images/Alerter_66x66.png'
+			}),
+			image: new Image({
+				url: 'http://owaveservices.info:8080/images/Bilan_66x66.png',
+				alt: 'Image alternate text', //Image alternate text
+			})
+		}));
+	}
+	//return conv.ask('Nous vous inquiettez pas, les secours ne vont pas trop tarder à arriver');
+  //Très bien. Les secours arrivent très rapidement.
 });
 
 exports.dialogflowFirebaseFulfillment = functions.https.onRequest(app);

@@ -163,20 +163,52 @@ conv.ask(`${NatureProblemeEntry} au 7 Rue Paul Vaillant Couturier, 92300 Levallo
 if ( !conv.surface.capabilities.has('actions.capability.SCREEN_OUTPUT') ) {
 	return conv.ask('Désolé mais veuillez utiliser un smartphone ou ChromeCastTV pour visualiser les informations');
 	}else{
-		// Create a basic card
-		return conv.ask(new BasicCard({
-			title: 'BILAN',
-			subtitle: 'Nature du problème',
-			formattedText: NatureProblemeEntry,
-			button: new Button({
-				title: 'Envoyer Bilan',
-				url: 'http://owaveservices.info:8080/images/Alerter_66x66.png'
-			}),
-			image: new Image({
-				url: 'http://owaveservices.info:8080/images/Bilan_66x66.png',
-				alt: 'Image alternate text', //Image alternate text
-			})
-		}));
+
+		return new Promise(function(resolve, reject){
+	
+			var url = 'http://owaveservices.info:5003/send_report_by_email';
+			var requestData = {
+				"report": "string"
+			}
+	
+			request({
+				url: url,
+				method: "POST",
+				json: requestData
+			}, function (err, response, body) {
+				// in addition to parsing the value, deal with possible errors
+				if (err) return reject(err);
+				try {
+					// JSON.parse() can throw an exception if not valid JSON
+					resolve(JSON.parse(body).data);
+				} catch(e) {
+					reject(e);
+				}
+			});
+		}).then(function(val) {
+
+			// Create a basic card
+			return conv.ask(new BasicCard({
+				title: 'BILAN',
+				subtitle: 'Nature du problème',
+				formattedText: NatureProblemeEntry,
+				button: new Button({
+					title: 'Envoyer Bilan',
+					url: 'http://owaveservices.info:8080/images/Alerter_66x66.png'
+				}),
+				image: new Image({
+					url: 'http://owaveservices.info:8080/images/Bilan_66x66.png',
+					alt: 'Image alternate text', //Image alternate text
+				})
+			}));
+			
+		}).catch(function(err) {
+			console.log(err);
+			return conv.ask('vos informations n\'ont pas été envoyé.');
+		});
+	
+	
+		
 	}
 	//return conv.ask('Nous vous inquiettez pas, les secours ne vont pas trop tarder à arriver');
   //Très bien. Les secours arrivent très rapidement.
